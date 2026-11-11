@@ -207,12 +207,12 @@ select.inp{background-image:linear-gradient(45deg,transparent 50%,var(--text2) 5
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 html.rm *{transition:none!important}
 /* ===================== v2: carácter visual ===================== */
-:root{--spring:cubic-bezier(.34,1.56,.64,1);--glass-b:rgba(253,252,250,.66);--hl:rgba(255,255,255,.75);--grad:linear-gradient(135deg,#6C8EBF 0%,#9585C2 100%)}
-html[data-theme="dark"]{--glass-b:rgba(36,39,48,.62);--hl:rgba(255,255,255,.07);--grad:linear-gradient(135deg,#5A7BB0 0%,#7664B0 100%)}
+:root{--spring:cubic-bezier(.34,1.56,.64,1);--glass-b:rgba(253,252,250,.88);--hl:rgba(255,255,255,.75);--grad:linear-gradient(135deg,#6C8EBF 0%,#9585C2 100%)}
+html[data-theme="dark"]{--glass-b:rgba(36,39,48,.86);--hl:rgba(255,255,255,.07);--grad:linear-gradient(135deg,#5A7BB0 0%,#7664B0 100%)}
 html,body{overflow-x:hidden}
 main{position:relative;z-index:1;padding-bottom:calc(var(--sb) + 130px)}
 .aurora{position:fixed;left:-25%;right:-25%;top:-15%;height:95vh;z-index:0;pointer-events:none;overflow:hidden;will-change:transform}
-.aurora i{position:absolute;border-radius:50%;filter:blur(64px);opacity:.6;will-change:transform}
+.aurora i{position:absolute;border-radius:50%;opacity:.6;will-change:transform;transform:translateZ(0)}
 .aurora i:nth-child(1){width:72vmax;height:72vmax;left:-6%;top:-18%;background:radial-gradient(circle,#A8BFE4 0%,transparent 66%);animation:drift1 24s ease-in-out infinite alternate}
 .aurora i:nth-child(2){width:62vmax;height:62vmax;right:-6%;top:2%;background:radial-gradient(circle,#CFC1F2 0%,transparent 66%);animation:drift2 29s ease-in-out infinite alternate}
 .aurora i:nth-child(3){width:58vmax;height:58vmax;left:22%;top:26%;background:radial-gradient(circle,#BDE3D0 0%,transparent 66%);animation:drift3 33s ease-in-out infinite alternate}
@@ -225,7 +225,7 @@ html[data-theme="dark"] .aurora i:nth-child(3){background:radial-gradient(circle
 @keyframes drift3{to{transform:translate(-10vw,-8vh) scale(1.2)}}
 
 /* cristal */
-.card,.list{background:var(--glass-b);backdrop-filter:blur(22px) saturate(165%);-webkit-backdrop-filter:blur(22px) saturate(165%);border:.5px solid var(--sep);border-radius:28px;box-shadow:inset 0 1px 0 var(--hl),0 1px 2px rgba(43,45,51,.04),0 16px 36px -14px rgba(43,45,51,.16)}
+.card,.list{background:var(--glass-b);border:.5px solid var(--sep);border-radius:28px;box-shadow:inset 0 1px 0 var(--hl),0 1px 2px rgba(43,45,51,.04),0 16px 36px -14px rgba(43,45,51,.16)}
 .card.tint-blue{background:linear-gradient(160deg,var(--blue-s),transparent 75%),var(--glass-b)}
 .card.tint-sage{background:linear-gradient(160deg,var(--sage-s),transparent 75%),var(--glass-b)}
 .card.tint-lav{background:linear-gradient(160deg,var(--lav-s),transparent 75%),var(--glass-b)}
@@ -283,7 +283,7 @@ h2.sec{font-size:21px;font-weight:700;letter-spacing:-.02em;margin:30px 4px 12px
 .srow.swiping .sbg{opacity:1}
 
 /* tarjetas Debo / Debería */
-.kc{border-radius:28px;padding:16px 18px;text-align:left;background:var(--glass-b);border:.5px solid var(--sep);color:var(--text);box-shadow:inset 0 1px 0 var(--hl),0 14px 30px -16px rgba(43,45,51,.2);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);transition:transform .5s var(--spring),box-shadow .3s}
+.kc{border-radius:28px;padding:16px 18px;text-align:left;background:var(--glass-b);border:.5px solid var(--sep);color:var(--text);box-shadow:inset 0 1px 0 var(--hl),0 14px 30px -16px rgba(43,45,51,.2);transition:transform .5s var(--spring),box-shadow .3s}
 .kc .small,.kc .tiny{opacity:.7}
 .kc .big-num{font-size:34px;font-weight:800}
 .kc:active{transform:scale(.96)}
