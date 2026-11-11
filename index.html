@@ -211,6 +211,22 @@ html.rm *{transition:none!important}
 html[data-theme="dark"]{--glass-b:rgba(36,39,48,.86);--hl:rgba(255,255,255,.07);--grad:linear-gradient(135deg,#5A7BB0 0%,#7664B0 100%)}
 html,body{overflow-x:hidden}
 main{position:relative;z-index:1;padding-bottom:calc(var(--sb) + 130px)}
+.xfab{position:fixed;right:calc(23px + var(--sr));bottom:calc(var(--sb) + 164px);z-index:25;width:46px;height:46px;border-radius:50%;background:var(--card);border:.5px solid var(--sep);font-size:21px;display:grid;place-items:center;box-shadow:0 10px 24px -10px rgba(43,45,51,.4)}
+.xfab[hidden]{display:none}
+.xfab:active{transform:scale(.92)}
+.qp{position:fixed;inset:0;z-index:70;background:rgba(20,22,28,.32);display:flex;align-items:flex-end;justify-content:center;padding:16px calc(14px + var(--sr)) calc(var(--sb) + 14px) calc(14px + var(--sl))}
+.qp-card{position:relative;width:100%;max-width:520px;background:var(--card);border:.5px solid var(--sep);border-radius:30px;padding:20px 18px 14px;box-shadow:0 30px 60px -20px rgba(20,22,28,.45)}
+.qp-x{position:absolute;right:12px;top:10px;width:36px;height:36px;border-radius:50%;color:var(--text2);font-size:16px}
+.qp-title{font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--blue);margin-bottom:6px}
+.qp-say{font-size:19px;font-weight:600;line-height:1.3;min-height:26px;padding-right:30px}
+.qp-ans{margin-top:12px;padding:13px 15px;border-radius:20px;background:var(--card2);font-size:16px;line-height:1.45}
+.qp-act{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.qp-row{display:flex;gap:10px;align-items:center;margin-top:14px}
+.qp-row input{flex:1;min-width:0;height:48px;border-radius:24px;border:.5px solid var(--sep);background:var(--card2);padding:0 16px;font-size:16px;color:var(--text)}
+.qp-mic{width:56px;height:56px;border-radius:50%;background:var(--grad);font-size:24px;color:#fff;flex:none}
+.qp-mic.on{animation:qpp 1.1s ease-in-out infinite}
+@keyframes qpp{0%,100%{box-shadow:0 0 0 0 rgba(108,142,191,.55)}50%{box-shadow:0 0 0 14px rgba(108,142,191,0)}}
+.qp-tip{margin-top:10px;font-size:12.5px;color:var(--text2);text-align:center}
 .aurora{position:fixed;left:-25%;right:-25%;top:-15%;height:95vh;z-index:0;pointer-events:none;overflow:hidden;will-change:transform}
 .aurora i{position:absolute;border-radius:50%;opacity:.6;will-change:transform;transform:translateZ(0)}
 .aurora i:nth-child(1){width:72vmax;height:72vmax;left:-6%;top:-18%;background:radial-gradient(circle,#A8BFE4 0%,transparent 66%);animation:drift1 24s ease-in-out infinite alternate}
@@ -1452,6 +1468,206 @@ function payDue(p,mk){ // fecha del pago en el mes mk (AAAA-MM)
   const [y,m]=mk.split("-").map(Number);const last=new Date(y,m,0).getDate();return`${mk}-${pad(Math.min(Number(p.day)||1,last))}`;
 }
 function payNext(p){const t=today();for(let i=0;i<14;i++){const d=new Date();d.setDate(1);d.setMonth(d.getMonth()+i-1);const mk=monthKey(d);if(p.since&&mk<p.since)continue;const ds=payDue(p,mk);if(!ds)continue;if((p.paid||[]).includes(mk)&&p.repeat!=="once")continue;if(p.repeat==="once"&&(p.paid||[]).length)return null;if(ds>=addDays(t,-31))return{ds,mk}}return null}
+/* ---- Xeva voz: lenguaje natural simple (el mismo código corre en la app y en el servidor) ---- */
+const XV = (() => {
+  const DIAS = ["domingo", "lunes", "martes", "miercoles", "jueves", "viernes", "sabado"];
+  const fold = (s) => String(s).replace(/[áàäÁ]/g, "a").replace(/[éèëÉ]/g, "e").replace(/[íìïÍ]/g, "i")
+    .replace(/[óòöÓ]/g, "o").replace(/[úùüÚ]/g, "u").replace(/[ñÑ]/g, "n").toLowerCase();
+  function parts(ts, tz) {
+    const f = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+    const o = {}; f.formatToParts(new Date(ts)).forEach((p) => (o[p.type] = p.value));
+    return { ds: `${o.year}-${o.month}-${o.day}`, h: +o.hour, m: +o.minute };
+  }
+  function offsetMs(ts, tz) {
+    const p = parts(ts, tz), [y, mo, d] = p.ds.split("-").map(Number);
+    return Date.UTC(y, mo - 1, d, p.h, p.m) - Math.floor(ts / 60000) * 60000;
+  }
+  function toTs(ds, h, m, tz) {
+    const [y, mo, d] = ds.split("-").map(Number), g = Date.UTC(y, mo - 1, d, h, m);
+    return g - offsetMs(g, tz);
+  }
+  const addD = (ds, n) => { const [y, m, d] = ds.split("-").map(Number); return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10); };
+  const dowOf = (ds) => { const [y, m, d] = ds.split("-").map(Number); return new Date(Date.UTC(y, m - 1, d)).getUTCDay(); };
+  const nextDow = (today, dow) => { let n = (dow - dowOf(today) + 7) % 7; if (n === 0) n = 7; return addD(today, n); };
+  const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+  const DIAS_T = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+  const dayName = (ds, today) => ds === today ? "hoy" : ds === addD(today, 1) ? "mañana"
+    : `el ${DIAS_T[dowOf(ds)]} ${+ds.slice(8)} de ${MESES[+ds.slice(5, 7) - 1]}`;
+  const say = (h, m) => {
+    const h12 = h % 12 === 0 ? 12 : h % 12, per = h < 12 ? "de la mañana" : h < 19 ? "de la tarde" : "de la noche";
+    return `${h12 === 1 && !m ? "la una" : "las " + h12}${m ? ":" + String(m).padStart(2, "0") : ""} ${per}`;
+  };
+
+  const ADD_RE = /^\s*(?:por favor[, ]*)?(?:xeva[, ]*)?(?:(recuerdame|recordarme|recuerda|anota|anotar|agrega|agregar|anade|anadir|apunta|apuntar|crea|crear|programa|programar|no olvides|tengo que|debo|deberia)\b)[:,]?\s*(?:que\s+|una?\s+(?:tarea|recordatorio)\s+(?:de\s+|para\s+)?)?/;
+  const isAdd = (q) => ADD_RE.test(fold(q));
+
+  function parseAdd(text, now, tz) {
+    let raw = String(text || "").trim(), f = fold(raw);
+    const today = parts(now, tz).ds;
+    const cut = (re) => { const m = f.match(re); if (!m) return null; raw = raw.slice(0, m.index) + " " + raw.slice(m.index + m[0].length); f = fold(raw); return m; };
+    let kind = "debo";
+    const v = cut(ADD_RE); if (v && v[1] === "deberia") kind = "deberia";
+    let ap = null, ds = null;
+    let m1 = cut(/\b(?:por |en |de |esta )?la manana\b|\besta manana\b/); if (m1) { ap = "am"; if (/esta/.test(m1[0])) ds = today; }
+    let m2 = cut(/\b(?:por |en |de |esta )?la (?:tarde|noche)\b|\besta (?:tarde|noche)\b/); if (m2) { ap = "pm"; if (/esta/.test(m2[0])) ds = ds || today; }
+    if (cut(/\bpasado manana\b/)) ds = addD(today, 2);
+    else if (cut(/\bhoy\b/)) ds = today;
+    else if (cut(/\bmanana\b/)) ds = addD(today, 1);
+    else { const w = cut(/\b(?:el |este |proximo )?(domingo|lunes|martes|miercoles|jueves|viernes|sabado)\b/); if (w) ds = nextDow(today, DIAS.indexOf(w[1])); }
+    // hora
+    let h = null, mi = 0, ap2 = null, mm;
+    if ((mm = cut(/\b(?:a|para|sobre) la una(?: y (media|cuarto))?\b/))) { h = 1; mi = mm[1] === "media" ? 30 : mm[1] === "cuarto" ? 15 : 0; }
+    else if ((mm = cut(/\b(?:a|para|sobre) las?\s+(\d{1,2})(?:[:.h](\d{2}))?(?:\s*(a\.? ?m\.?|p\.? ?m\.?))?(?:\s+y\s+(media|cuarto))?/))) {
+      h = +mm[1]; mi = mm[2] ? +mm[2] : mm[4] === "media" ? 30 : mm[4] === "cuarto" ? 15 : 0; if (mm[3]) ap2 = /^p/.test(mm[3]) ? "pm" : "am";
+    } else if ((mm = cut(/\b(\d{1,2})(?::(\d{2}))?\s*(a\.? ?m\.?|p\.? ?m\.?)(?=\s|$)/))) {
+      h = +mm[1]; mi = mm[2] ? +mm[2] : 0; ap2 = /^p/.test(mm[3]) ? "pm" : "am";
+    }
+    let time = null;
+    if (h !== null && h <= 24 && mi < 60) {
+      const mk = ap2 || ap;
+      if (mk === "pm" && h < 12) h += 12;
+      else if (mk === "am" && h === 12) h = 0;
+      else if (!mk && h >= 1 && h <= 6) h += 12;
+      time = { h: h % 24, m: mi };
+    }
+    let title = raw.replace(/\s+/g, " ").trim();
+    for (let i = 0; i < 3; i++) title = title.replace(/^(?:que|de|para|a|el|la|me|mi)\s+/i, "").replace(/\s+(?:el|para|a|de|en|que|por|y|este|esta)$/i, "").trim();
+    title = title.replace(/^[,.:;\s]+|[,.:;\s]+$/g, "");
+    if (!title) return null;
+    title = title.charAt(0).toUpperCase() + title.slice(1);
+    if (time && !ds) { const nowP = parts(now, tz); ds = (time.h * 60 + time.m > nowP.h * 60 + nowP.m) ? today : addD(today, 1); }
+    return { title, ds: ds || "", time, kind, today, at: time ? toTs(ds, time.h, time.m, tz) : null };
+  }
+  function confirmAdd(p) {
+    if (p.time) return `Listo. Te aviso ${dayName(p.ds, p.today)} a ${say(p.time.h, p.time.m)}: ${p.title}.`;
+    if (p.ds) return `Anotado para ${dayName(p.ds, p.today)}: ${p.title}.`;
+    return `Anotado: ${p.title}.`;
+  }
+
+  // ¿de qué momento hablan?
+  function when(q, now, tz) {
+    let f = fold(q), today = parts(now, tz).ds, per = null, ds = today, span = 1, lab = "hoy";
+    const rm = (re) => { const m = f.match(re); if (m) f = f.replace(re, " "); return m; };
+    if (rm(/\b(?:por |en |de |esta )?la manana\b|\besta manana\b/)) per = "am";
+    else if (rm(/\b(?:por |en |de |esta )?la tarde\b|\besta tarde\b/)) per = "tarde";
+    else if (rm(/\b(?:por |en |de |esta )?la noche\b|\besta noche\b/)) per = "noche";
+    if (rm(/\bpasado manana\b/)) { ds = addD(today, 2); lab = "pasado mañana"; }
+    else if (rm(/\bmanana\b/)) { ds = addD(today, 1); lab = "mañana"; }
+    else if (/\b(?:esta |la |proxima )?semana\b/.test(f)) { span = 7; lab = "esta semana"; }
+    else { const w = f.match(/\b(domingo|lunes|martes|miercoles|jueves|viernes|sabado)\b/); if (w) { ds = nextDow(today, DIAS.indexOf(w[1])); lab = dayName(ds, today); } }
+    const H = { am: [5, 12], tarde: [12, 19], noche: [19, 24] }[per] || [0, 24];
+    const from = toTs(ds, H[0], 0, tz), to = span > 1 ? toTs(addD(ds, span), 0, 0, tz) : toTs(H[1] === 24 ? addD(ds, 1) : ds, H[1] === 24 ? 0 : H[1], 0, tz);
+    return { ds, span, per, lab, from, to, today };
+  }
+  const isAsk = (q) => /\b(toca|tengo|pendiente|agenda|programad|que hay|que sigue|cuando|plan|hacer|pagos?|pagar|recordator|eventos?|rutina|reunion)/.test(fold(q));
+
+  // respuesta hablada con la agenda. items: [{id,at,title,body}], tasks: [{title,due,kind}]
+  function answer(q, now, tz, items, tasks) {
+    const w = when(q, now, tz), dates = []; for (let i = 0; i < w.span; i++) dates.push(addD(w.ds, i));
+    const lo = Math.max(w.from, now);
+    const ev = (items || []).filter((i) => i.at >= lo && i.at < w.to && !/^(dg|rit):/.test(i.id || "")).sort((a, b) => a.at - b.at);
+    const tk = (tasks || []).filter((t) => t.due && dates.includes(t.due));
+    const clean = (s) => String(s || "").replace(/^Xevapp\s*·\s*/, "").replace(/^[^\p{L}\p{N}]+/u, "").trim();
+    const where = w.per ? `${w.lab} ${w.per === "am" ? "por la mañana" : w.per === "tarde" ? "por la tarde" : "por la noche"}` : w.lab;
+    const bits = ev.slice(0, 6).map((i) => { const p = parts(i.at, tz); const pre = w.span > 1 ? dayName(p.ds, w.today) + " " : ""; return `${pre}a ${say(p.h, p.m)}, ${clean(i.title)}`; });
+    let out = "";
+    if (bits.length) out += `${where[0].toUpperCase() + where.slice(1)} te toca: ${bits.join("; ")}.`;
+    if (tk.length) out += `${out ? " " : (where[0].toUpperCase() + where.slice(1) + " tienes: ")}${out ? "Y sin hora fija: " : ""}${tk.slice(0, 6).map((t) => t.title).join(", ")}.`;
+    if (!out) out = `${where[0].toUpperCase() + where.slice(1)} no tienes nada programado.`;
+    return { text: out, count: bits.length + tk.length };
+  }
+  return { fold, parts, toTs, addD, isAdd, isAsk, parseAdd, confirmAdd, answer, when, dayName, say };
+})();
+/* ---- fin Xeva voz ---- */
+
+/* ---------- Xeva rápida: hablar, anotar y preguntar por voz ---------- */
+const TZ=()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone||"America/Bogota"}catch{return"America/Bogota"}};
+let qrec=null;
+async function xevaHandle(text){
+  const now=Date.now(),tz=TZ();
+  if(XV.isAdd(text)){
+    const p=XV.parseAdd(text,now,tz);
+    if(!p)return{text:"No entendí qué anotar. Prueba: recuérdame mañana a las 3 pagar el arriendo."};
+    const snap=JSON.stringify(S);
+    if(p.time)S.reminders.push({id:uid(),title:p.title,at:`${p.ds}T${pad(p.time.h)}:${pad(p.time.m)}`,kind:"recordatorio",repeat:"none",notes:"Por voz"});
+    else S.tasks.push(newTask({title:p.title,kind:p.kind,area:"Personal",due:p.ds,priority:"media",notes:"Por voz"}));
+    save();render();
+    return{text:XV.confirmAdd(p),undo:snap};
+  }
+  if(XV.isAsk(text)){
+    const items=schedule(8).map(({id,at,title,body})=>({id,at,title,body}));
+    const tasks=S.tasks.filter(x=>!x.done&&x.due).map(x=>({title:x.title,due:x.due,kind:x.kind}));
+    return{text:XV.answer(text,now,tz,items,tasks).text};
+  }
+  try{
+    const r=await callAI({system:"Eres Xeva, el asistente personal de voz de Xevapp. Responde en español, máximo 3 frases cortas, sin listas ni markdown.\n\n"+buildContext(),messages:[{role:"user",content:text}]});
+    return{text:String(r).replace(/```[\s\S]*?```/g,"").trim()||"No tengo respuesta para eso."};
+  }catch(e){return{text:e.message||"No pude consultar la IA ahora.",open:true}}
+}
+function xevaClose(){try{qrec&&qrec.abort()}catch{}qrec=null;try{speechSynthesis.cancel()}catch{}const el=$("#qp");if(!el)return;const g=G();const done=()=>{el.remove();const f=$("#xfab");if(f)f.hidden=false};g?g.to($(".qp-card",el),{y:60,opacity:0,duration:.22,ease:"power2.in",onComplete:done}):done()}
+function xevaListen(){
+  unlockSpeech();
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition,say=$("#qpSay"),mic=$("#qpMic");
+  if(!SR){say.textContent="Este iPhone no deja dictar aquí. Toca el micrófono del teclado y escribe abajo.";$("#qpIn").focus();return}
+  if(qrec){try{qrec.stop()}catch{}return}
+  const r=new SR();qrec=r;r.lang="es-CO";r.interimResults=true;r.continuous=false;
+  let final="";mic.classList.add("on");say.textContent="Te escucho…";
+  r.onresult=e=>{let t="";for(const x of e.results)t+=x[0].transcript;final=t;say.textContent="“"+t+"”"};
+  r.onerror=e=>{if(e.error==="not-allowed"||e.error==="service-not-allowed")say.textContent="Permite el micrófono para Xevapp (Ajustes del iPhone) o escribe abajo.";else if(e.error==="no-speech")say.textContent="No te escuché. Toca el micrófono otra vez."};
+  r.onend=()=>{mic.classList.remove("on");qrec=null;if(final.trim())xevaRun(final.trim())};
+  try{r.start()}catch{mic.classList.remove("on");qrec=null;say.textContent="Toca el micrófono para hablar."}
+}
+async function xevaRun(text){
+  const say=$("#qpSay"),ans=$("#qpAns"),act=$("#qpAct");if(!say)return;
+  say.textContent="“"+text+"”";ans.hidden=false;ans.innerHTML=`<span class="typing"><i></i><i></i><i></i></span>`;act.innerHTML="";
+  const g=G();if(g)g.to($$(".typing i",ans),{opacity:1,y:-3,repeat:-1,yoyo:true,stagger:.15,duration:.4});
+  const r=await xevaHandle(text);if(!$("#qpAns"))return;
+  ans.textContent=r.text;
+  if(g)g.fromTo(ans,{y:10,opacity:0},{y:0,opacity:1,duration:.4,ease:"power3.out"});
+  act.innerHTML=`<button class="btn sm ghost" data-qsay>🔊 Escuchar</button>${r.undo?'<button class="btn sm ghost" data-qundo>Deshacer</button>':""}${r.open?'<button class="btn sm ghost" data-qopen>Abrir Asistente</button>':""}`;
+  $("[data-qsay]",act).onclick=()=>{unlockSpeech();speak(r.text)};
+  if(r.undo)$("[data-qundo]",act).onclick=()=>{Object.keys(S).forEach(k=>delete S[k]);Object.assign(S,JSON.parse(r.undo));save();render();ans.textContent="Deshecho.";act.innerHTML=""};
+  if(r.open)$("[data-qopen]",act).onclick=()=>{xevaClose();askAgent("strategist",text)};
+  speak(r.text);
+}
+function xevaOpen({q,listen}={}){
+  let el=$("#qp");if(el)el.remove();
+  el=document.createElement("div");el.id="qp";el.className="qp";
+  el.innerHTML=`<div class="qp-card" role="dialog" aria-label="Hablar con Xeva">
+    <button class="qp-x" aria-label="Cerrar" data-qx>✕</button>
+    <div class="qp-title">Xeva</div>
+    <div class="qp-say" id="qpSay">Dime qué anotar o pregúntame qué te toca.</div>
+    <div class="qp-ans" id="qpAns" hidden></div>
+    <div class="qp-act" id="qpAct"></div>
+    <div class="qp-row"><button class="qp-mic" id="qpMic" aria-label="Hablar">🎙️</button><input id="qpIn" placeholder="o escríbelo aquí…" enterkeyhint="send" autocomplete="off"></div>
+    <div class="qp-tip">Prueba: “recuérdame mañana a las 3 pagar el arriendo” · “¿qué me toca hoy por la tarde?”</div></div>`;
+  document.body.appendChild(el);const f=$("#xfab");if(f)f.hidden=true;
+  const g=G();if(g){g.fromTo(el,{opacity:0},{opacity:1,duration:.2});g.fromTo($(".qp-card",el),{y:70,opacity:0,scale:.96},{y:0,opacity:1,scale:1,duration:.5,ease:"back.out(1.5)"})}
+  el.onclick=e=>{if(e.target===el||e.target.closest("[data-qx]"))xevaClose()};
+  $("#qpMic").onclick=xevaListen;
+  $("#qpIn").onkeydown=e=>{if(e.key==="Enter"&&e.target.value.trim()){const v=e.target.value.trim();e.target.value="";unlockSpeech();xevaRun(v)}};
+  if(q)xevaRun(q);else if(listen)setTimeout(xevaListen,350);
+}
+async function importVoice(){
+  if(!S.settings.pushUrl||!S.pushId||PREVIEW)return;
+  try{
+    const r=await fetch(pushBase()+"/pending?id="+encodeURIComponent(S.pushId)+"&tz="+encodeURIComponent(TZ()));
+    const j=await r.json(),L=j.items||[];if(!L.length)return;
+    L.forEach(p=>{
+      if(p.hm&&p.ds)S.reminders.push({id:uid(),title:p.title,at:`${p.ds}T${p.hm}`,kind:"recordatorio",repeat:"none",notes:"Por voz"});
+      else S.tasks.push(newTask({title:p.title,kind:p.kind==="deberia"?"deberia":"debo",area:"Personal",due:p.ds||"",priority:"media",notes:"Por voz"}));
+    });
+    save();render();toast(L.length>1?`${L.length} cosas anotadas por voz ✓`:"1 cosa anotada por voz ✓");
+  }catch{}
+}
+function mountFab(){
+  if($("#xfab"))return;
+  const b=document.createElement("button");b.id="xfab";b.className="xfab";b.setAttribute("aria-label","Hablar con Xeva");b.textContent="🎙️";
+  b.onclick=()=>{unlockSpeech();xevaOpen({listen:true})};
+  document.body.appendChild(b);
+  const g=G();if(g)g.from(b,{scale:0,duration:.6,ease:"back.out(2)",delay:.6});
+}
+
 function schedule(days=45){
   const now=Date.now(),end=now+days*864e5,out=[],t=today();
   const add=(id,at,title,body,tab)=>{if(at>=now-36e5*12&&at<=end)out.push({id,at,title,body,tab})};
@@ -1484,8 +1700,8 @@ let syncT=null;
 function schedSync(){if(!S.settings.pushUrl||S.pushInfo!=="ok"||PREVIEW)return;clearTimeout(syncT);syncT=setTimeout(syncPush,2500)}
 const pushBase=()=>S.settings.pushUrl.trim().replace(/\/+$/,"");
 async function syncPush(){
-  try{const items=schedule(45).filter(x=>x.at>Date.now()).slice(0,400).map(({id,at,title,body})=>({id,at,title:"Xevapp · "+title,body}));
-    const r=await fetch(pushBase()+"/sync",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:S.pushId,items})});
+  try{const items=schedule(45).filter(x=>x.at>Date.now()).slice(0,400).map(({id,at,title,body})=>({id,at,title:"Xevapp · "+title,body}));const tasks=S.tasks.filter(x=>!x.done&&x.due).slice(0,150).map(x=>({title:x.title,due:x.due,kind:x.kind}));
+    const r=await fetch(pushBase()+"/sync",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:S.pushId,items,tasks})});
     const j=await r.json();return j;}catch{return null}
 }
 function b64uToBytes(b){const p="=".repeat((4-b.length%4)%4);const s=atob((b+p).replace(/-/g,"+").replace(/_/g,"/"));return Uint8Array.from(s,c=>c.charCodeAt(0))}
@@ -1619,6 +1835,10 @@ function settingsSheet(){
   <div class="btns"><button type="button" class="btn sm" data-push>${S.pushInfo==="ok"?"Reconectar":"Conectar avisos"}</button>${S.pushInfo==="ok"?'<button type="button" class="btn sm ghost" data-ptest>Enviar aviso de prueba</button><button type="button" class="btn sm ghost" data-psync>Sincronizar ahora</button>':""}</div>
   <div class="small" id="pushOut" style="margin:8px 4px 12px;color:var(--text2)">${S.pushInfo==="ok"?"✓ Conectado: tus avisos llegan aunque la app esté cerrada.":"Sin conectar: los avisos solo llegan con Xevapp abierta."}</div>
 
+  <h2 class="sec">Botón de acción · voz</h2>
+  <div class="note">Un atajo del iPhone le habla a Xeva sin abrir la app: anota cosas (<i>“recuérdame mañana a las 3…”</i>) y responde en voz alta qué te toca. Copia los datos y pégalos en el atajo (guía <b>XEVA_VOZ.md</b>).</div>
+  ${S.pushInfo==="ok"&&S.pushId?'<div class="btns"><button type="button" class="btn sm" data-copyask>Copiar datos del atajo</button></div>':'<div class="small" style="margin:0 4px 12px;color:var(--text2)">Conecta primero los avisos siempre (arriba).</div>'}
+
   <h2 class="sec">Apariencia</h2>
   <div class="f2">${fld("Tema",sel("theme",[["auto","Automático"],["light","Claro"],["dark","Oscuro"]],st.theme))}${fld("Moneda",sel("currency",["COP","USD","EUR","MXN","PEN","CLP","ARS"],st.currency))}</div>
   ${sw("reduceMotion",st.reduceMotion,"Reducir animaciones")}
@@ -1642,6 +1862,7 @@ function settingsSheet(){
   onMount:(f,close)=>{
     const pOut=$("#pushOut",f);
     $("[data-push]",f).onclick=async()=>{S.settings.pushUrl=f.pushUrl.value.trim();await connectPush(pOut)};
+    $("[data-copyask]",f)&&($("[data-copyask]",f).onclick=async()=>{const u=`Dirección: ${pushBase()}/ask\nid: ${S.pushId}\ntz: ${TZ()}`;try{await navigator.clipboard.writeText(u);toast("Datos del atajo copiados ✓")}catch{pOut.textContent=u}});
     $("[data-ptest]",f)&&($("[data-ptest]",f).onclick=()=>testPush(pOut));
     $("[data-psync]",f)&&($("[data-psync]",f).onclick=async()=>{const j=await syncPush();pOut.textContent=j?`✓ ${j.count} avisos programados en tu servidor.`:"No se pudo sincronizar."});
     const box=$("#provBox",f);
@@ -1835,9 +2056,13 @@ function detectSandbox(){
   if(!S.onboarded)onboarding();
   await registerSW();
   if(PREVIEW&&S.ui.tab==="asistente")render();
+  mountFab();
+  const qs=new URLSearchParams(location.search);
+  if(qs.has("q")||qs.has("voz")){const qq=qs.get("q");try{history.replaceState(null,"",location.pathname)}catch{}xevaOpen(qq?{q:qq}:{listen:true})}
+  await importVoice();
   checkReminders();
-  setInterval(checkReminders,20000);
-  document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){checkReminders();if(S.ui.tab==="hoy")render()}else saveNow()});
+  setInterval(()=>{importVoice();checkReminders()},20000);
+  document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){importVoice();checkReminders();if(S.ui.tab==="hoy")render()}else saveNow()});
   window.addEventListener("pagehide",saveNow);
   // cambio de día con la app abierta
   let lastDay=today();setInterval(()=>{if(today()!==lastDay){lastDay=today();render()}},60000);

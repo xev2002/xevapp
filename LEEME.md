@@ -12,3 +12,8 @@
 9. Para avisos **siempre** (con la app cerrada) sigue `AVISOS.md` una vez (servidor gratis en Cloudflare, ~10 min).
 
 Para actualizar la app más adelante, vuelve a subir `index.html` (y cambia `xevapp-v3` por `xevapp-v4` en `sw.js` para que el iPhone tome la versión nueva).
+
+
+## Voz y botón de acción
+
+Mira `XEVA_VOZ.md`. Después de subir los archivos, vuelve a pegar `xevapp-avisos-worker.js` en tu Worker de Cloudflare (Edit code → Deploy).
