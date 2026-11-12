@@ -1,5 +1,5 @@
 /* Xevapp service worker: funciona sin conexión y muestra notificaciones */
-const CACHE = "xevapp-v6";
+const CACHE = "xevapp-v7";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon-180.png", "./icon-192.png", "./icon-512.png", "./gsap.min.js", "./Flip.min.js"];
 const CDN = [];
 const NETWORK_ONLY = ["openrouter.ai", "generativelanguage.googleapis.com", "api.groq.com"];
