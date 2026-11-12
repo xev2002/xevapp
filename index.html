@@ -1619,6 +1619,25 @@ const XV = (() => {
 })();
 /* ---- fin Xeva voz ---- */
 
+/* ---------- Día nuevo: todo se reinicia a medianoche ---------- */
+let dayNow=null,midT=null;
+function rollDay(){
+  const t=today();if(dayNow===null){dayNow=t;return false}
+  if(t===dayNow)return false;
+  dayNow=t;
+  // la vista vuelve a hoy: calendario, check-in y pantalla
+  S.ui.calM=t.slice(0,7);S.ui.calD=t;
+  $$(".ov").forEach(o=>{if(o.querySelector("[data-ci]")){o.remove();if(!$(".ov"))document.body.style.overflow=""}});
+  if(S.ui.ciDay&&S.ui.ciDay!==t)delete S.ui.ciDay;
+  save();render();
+  if(typeof syncPush==="function")try{syncPush()}catch{}
+  try{swReg&&swReg.update()}catch{}
+  armMidnight();
+  return true;
+}
+function armMidnight(){clearTimeout(midT);const n=new Date(),m=new Date(n.getFullYear(),n.getMonth(),n.getDate()+1,0,0,5);midT=setTimeout(()=>{rollDay();maybeCheckin()},Math.min(m-n,2147483000))}
+function wake(){if(!rollDay())render();importVoice();checkReminders();maybeCheckin();armMidnight()}
+
 /* ---------- Configurar Xevapp (todo dentro de la app) ---------- */
 const isSafari=()=>/Safari/.test(navigator.userAgent)&&!/CriOS|FxiOS|EdgiOS|OPiOS|GSA|FBAN|FBAV|Instagram|Line\//.test(navigator.userAgent);
 function setupStatus(){
@@ -1785,7 +1804,7 @@ function challengeForm(c,tpl){
 }
 function checkinSheet(){
   const P=chPending();if(!P.length)return;
-  openSheet({title:"¿Cómo te fue hoy?",html:P.map(c=>chRow(c)).join("")+`<p class="muted small" style="text-align:center">También puedes decirle a Xeva: “hice el trote” o “hice 80 flexiones”.</p>`,submit:null,
+  openSheet({title:"¿Cómo te fue hoy?",html:'<i data-ci hidden></i>'+P.map(c=>chRow(c)).join("")+`<p class="muted small" style="text-align:center">También puedes decirle a Xeva: “hice el trote” o “hice 80 flexiones”.</p>`,submit:null,
     onMount:(f,close)=>{f.addEventListener("click",e=>{const b=e.target.closest("[data-act^=chal]");if(b)setTimeout(()=>{if(!chPending().length)close();else{close();checkinSheet()}},250)})}});
 }
 function maybeCheckin(){
@@ -2309,8 +2328,11 @@ function detectSandbox(){
   await importVoice();
   checkReminders();
   maybeCheckin();
-  setInterval(()=>{importVoice();checkReminders()},20000);
-  document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){importVoice();checkReminders();maybeCheckin();if(S.ui.tab==="hoy")render()}else saveNow()});
+  rollDay();setInterval(()=>{rollDay();importVoice();checkReminders()},20000);
+  document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")wake();else saveNow()});
+  window.addEventListener("pageshow",e=>{if(e.persisted)wake()});
+  window.addEventListener("focus",()=>rollDay());
+  armMidnight();
   window.addEventListener("pagehide",saveNow);
   // cambio de día con la app abierta
   let lastDay=today();setInterval(()=>{if(today()!==lastDay){lastDay=today();render()}},60000);
