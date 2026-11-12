@@ -1393,14 +1393,26 @@ function mountChat(){
 }
 function askAgent(agentId,text,pid){S.ui.tab="asistente";S.ui.agent=agentId;render({anim:true});window.scrollTo(0,document.body.scrollHeight);setTimeout(()=>sendMsg(text,pid),150)}
 let speechUnlocked=false,rec=null;
-function unlockSpeech(){if(speechUnlocked||!("speechSynthesis" in window))return;try{const u=new SpeechSynthesisUtterance(" ");u.volume=0;speechSynthesis.speak(u);speechUnlocked=true}catch{}}
-function speak(text){
-  if(!("speechSynthesis" in window))return toast("Este dispositivo no permite leer en voz alta");
-  try{speechSynthesis.cancel();
-    const clean=String(text).replace(/```[\s\S]*?```/g,"").replace(/[*#_`>]/g,"").replace(/^\s*[-•]\s*/gm,"").replace(/\n{2,}/g,". ").slice(0,1800);
-    const u=new SpeechSynthesisUtterance(clean);u.lang="es-CO";u.rate=1.02;
-    const vs=speechSynthesis.getVoices();u.voice=vs.find(v=>/es[-_](CO|MX|US|419)/i.test(v.lang))||vs.find(v=>/^es/i.test(v.lang))||null;
-    speechSynthesis.speak(u)}catch{}
+let esVoice=null;
+function pickVoice(){try{const vs=speechSynthesis.getVoices();esVoice=vs.find(v=>/es[-_](CO|US|MX|419)/i.test(v.lang)&&/paulina|m[oó]nica|juan|siri|enhanced|premium/i.test(v.name))||vs.find(v=>/es[-_](CO|US|MX|419)/i.test(v.lang))||vs.find(v=>/^es/i.test(v.lang))||null}catch{}}
+if("speechSynthesis" in window){pickVoice();try{speechSynthesis.onvoiceschanged=pickVoice}catch{}}
+function audioPlayback(){try{if(navigator.audioSession)navigator.audioSession.type="playback"}catch{}}
+function unlockSpeech(){audioPlayback();if(speechUnlocked||!("speechSynthesis" in window))return;speechUnlocked=true;pickVoice();try{const u=new SpeechSynthesisUtterance(".");u.volume=0;u.rate=2;speechSynthesis.speak(u)}catch{}}
+// habla y avisa qué pasó: cb("start"|"end"|"error:x"|"mute")
+function speak(text,cb){
+  if(!("speechSynthesis" in window)){cb&&cb("error:sin-voz");return toast("Este dispositivo no permite leer en voz alta")}
+  audioPlayback();
+  const clean=String(text).replace(/```[\s\S]*?```/g,"").replace(/[*#_`>]/g,"").replace(/^\s*[-•]\s*/gm,"").replace(/\n{2,}/g,". ").slice(0,1800);
+  const go=()=>{try{
+    const u=new SpeechSynthesisUtterance(clean);if(!esVoice)pickVoice();
+    if(esVoice){u.voice=esVoice;u.lang=esVoice.lang}else u.lang="es-MX";
+    u.rate=1;u.pitch=1;u.volume=1;let started=false;
+    u.onstart=()=>{started=true;cb&&cb("start")};u.onend=()=>cb&&cb("end");u.onerror=e=>cb&&cb("error:"+(e.error||"x"));
+    speechSynthesis.speak(u);try{speechSynthesis.resume()}catch{}
+    setTimeout(()=>{if(!started)cb&&cb("mute")},2500);
+  }catch(e){cb&&cb("error:"+(e.message||e))}};
+  // en iPhone, cancelar y hablar en el mismo instante se traga la voz
+  if(speechSynthesis.speaking||speechSynthesis.pending){speechSynthesis.cancel();setTimeout(go,180)}else go();
 }
 function startMic(btn){
   unlockSpeech();
@@ -1651,7 +1663,7 @@ function setupSheet(){
       q("[data-ntest10]").onclick=()=>{const o=q("[data-nout]");let n=10;o.textContent="Llega en 10 s. Deja Xevapp abierta (puedes ir a otra pestaña de la app).";const t=setInterval(()=>{n--;if(n<=0){clearInterval(t);testN(o)}else if(document.body.contains(o))o.textContent=`Llega en ${n} s…`},1000)};
       f.su_prov.onchange=()=>{S.settings.provider=f.su_prov.value;save();reopen()};
       q("[data-aitest]").onclick=async()=>{const o=q("[data-aout]"),pv=f.su_prov.value,typed=f.su_key.value.trim();const key=typed&&!typed.includes("•")?typed:getKeys()[pv];if(!key){o.textContent="Pega tu clave primero.";return}o.textContent="Probando…";const msg=await testConnection(pv,key);o.textContent=msg;if(/^✓/.test(msg)){setKey(pv,key);S.settings.provider=pv;save();toast("IA conectada ✓");setTimeout(reopen,900)}};
-      q("[data-stest]").onclick=()=>{unlockSpeech();speak("Hola, soy Xeva. Ya puedo hablarte.");q("[data-vout]").textContent="Si no escuchaste nada: sube el volumen y quita el modo silencio."};
+      q("[data-stest]").onclick=()=>{unlockSpeech();const o=q("[data-vout]");o.textContent="Preparando la voz…";speak("Hola, soy Xeva. Ya puedo hablarte.",st=>{if(!document.body.contains(o))return;if(st==="start")o.textContent="🔊 Hablando"+(esVoice?" ("+esVoice.name+")":"")+"…";else if(st==="end")o.textContent="✓ ¿La escuchaste? Si no, sube el volumen.";else if(st==="mute")o.innerHTML="No arrancó la voz. Revisa: <b>1)</b> quita el <b>modo silencio</b> (botón de acción o Centro de control) <b>2)</b> sube el volumen <b>3)</b> Ajustes → Accesibilidad → Contenido leído: debe haber una voz en español descargada.";else o.textContent="Error de voz ("+st.slice(6)+"). Toca otra vez."})};
       q("[data-vtest]").onclick=()=>{unlockSpeech();const o=q("[data-vout]"),SR=window.SpeechRecognition||window.webkitSpeechRecognition;
         if(!SR){S.voiceOk=true;save();o.innerHTML="Este iPhone no deja usar el micrófono directo en apps web. Usa el <b>🎙️ del teclado</b> dentro del panel de Xeva: funciona igual. ✓";return}
         const r=new SR();r.lang="es-CO";r.interimResults=true;let txt="";o.textContent="Te escucho… di algo.";
@@ -1847,7 +1859,7 @@ async function xevaRun(text){
   $("[data-qsay]",act).onclick=()=>{unlockSpeech();speak(r.text)};
   if(r.undo)$("[data-qundo]",act).onclick=()=>{Object.keys(S).forEach(k=>delete S[k]);Object.assign(S,JSON.parse(r.undo));save();render();ans.textContent="Deshecho.";act.innerHTML=""};
   if(r.open)$("[data-qopen]",act).onclick=()=>{xevaClose();askAgent("strategist",text)};
-  speak(r.text);
+  speak(r.text,st=>{if(st==="mute"&&$("#qpAct"))$("#qpAct").insertAdjacentHTML("beforeend",'<div class="small" style="width:100%;color:var(--text2)">🔇 No sonó: quita el modo silencio y sube el volumen.</div>')});
 }
 function xevaOpen({q,listen}={}){
   let el=$("#qp");if(el)el.remove();
