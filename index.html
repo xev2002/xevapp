@@ -988,7 +988,7 @@ function taskForm(t,preset={}){
     ${fld("Subtareas (una por línea)",txt("subs",(t.subtasks||[]).map(s=>(s.done?"[x] ":"")+s.title).join("\n"),"Paso 1\nPaso 2"))}
     ${fld("Notas",txt("notes",t.notes))}
     ${sw("focus",t.focus,"Enfoque del día","Aparece arriba en Hoy (máximo 3)")}
-    ${!isNew?`<div class="btns"><button type="button" class="btn sm ghost" data-ics>${icon("cal")}Añadir al Calendario</button><button type="button" class="btn sm danger" data-del>${icon("trash")}Eliminar</button></div>`:""}`,
+    ${!isNew?`<div class="btns"><button type="button" class="btn sm ghost" data-rrestart>↺ Reiniciar desde hoy</button><button type="button" class="btn sm ghost" data-rtoday>Desmarcar hoy</button><button type="button" class="btn sm danger" data-del>${icon("trash")}Eliminar</button></div>`:""}`,
     onMount:(f,close)=>{
       const sync=()=>$$(".segopt",f).forEach(s=>{const on=s.previousElementSibling.checked;s.style.background=on?"var(--card)":"transparent";s.style.color=on?"var(--text)":"var(--text2)";s.style.boxShadow=on?"0 1px 3px rgba(0,0,0,.08)":"none"});
       f.addEventListener("change",sync);sync();
@@ -1017,6 +1017,8 @@ function routineForm(r){
     ${!isNew?`<div class="btns"><button type="button" class="btn sm ghost" data-ics>${icon("cal")}Añadir al Calendario</button><button type="button" class="btn sm danger" data-del>${icon("trash")}Eliminar</button></div>`:""}`,
     onMount:(f,close)=>{
       $("[data-del]",f)&&($("[data-del]",f).onclick=()=>{S.routines=S.routines.filter(x=>x.id!==r.id);close();save();render()});
+      $("[data-rrestart]",f)&&($("[data-rrestart]",f).onclick=()=>{r.log={};close();save();render();toast("Rutina reiniciada desde hoy")});
+      $("[data-rtoday]",f)&&($("[data-rtoday]",f).onclick=()=>{if(r.log)delete r.log[today()];close();save();render();toast("Hoy quedó sin marcar")});
       $("[data-ics]",f)&&($("[data-ics]",f).onclick=()=>{if(!r.time)return toast("Pon una hora de inicio");const[h,m]=r.time.split(":").map(Number);const d=new Date();d.setHours(h,m,0,0);downloadIcs({title:"Rutina: "+r.name,start:d,rrule:"FREQ=WEEKLY;BYDAY="+r.days.map(x=>["SU","MO","TU","WE","TH","FR","SA"][x]).join(","),notes:r.steps.map(s=>s.title).join(", ")})});
     },
     submit:(o,fd)=>{
@@ -2321,6 +2323,7 @@ function detectSandbox(){
   load();DAY_CUT=Number(S.settings.dayCut??4);
   // una sola vez: reiniciar las flexiones desde hoy (pedido del 12 de nov)
   if(!S.mig_flex1){S.mig_flex1=1;(S.challenges||[]).filter(c=>c.type==="progressive"&&/flexi/i.test(c.name+" "+(c.unit||""))).forEach(c=>{c.from=today();c.log={}});save()}
+  if(!S.mig_flex2){S.mig_flex2=1;(S.routines||[]).filter(r=>/flexi/i.test(r.name+" "+(r.steps||[]).map(x=>x.name).join(" "))).forEach(r=>{r.log={}});save()}
   applyTheme();detectSandbox();
   render({anim:true});
   if(!S.onboarded)onboarding();
