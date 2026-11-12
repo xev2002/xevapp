@@ -40,7 +40,7 @@ const XV = (() => {
     return `${h12 === 1 && !m ? "la una" : "las " + h12}${m ? ":" + String(m).padStart(2, "0") : ""} ${per}`;
   };
 
-  const ADD_RE = /^\s*(?:por favor[, ]*)?(?:xeva[, ]*)?(?:(recuerdame|recordarme|recuerda|anota|anotar|agrega|agregar|anade|anadir|apunta|apuntar|crea|crear|programa|programar|no olvides|tengo que|debo|deberia)\b)[:,]?\s*(?:que\s+|una?\s+(?:tarea|recordatorio)\s+(?:de\s+|para\s+)?)?/;
+  const ADD_RE = /^\s*(?:por favor[, ]*)?(?:xeva[, ]*)?(?:(recuerdame|recordarme|recuerda|anota|anotar|agrega|agregar|anade|anadir|apunta|apuntar|guarda|guardar|guardame|crea|crear|programa|programar|no olvides|tengo que|debo|deberia)\b)[:,]?\s*(?:que\s+|una?\s+(?:tarea|recordatorio)\s+(?:de\s+|para\s+)?)?/;
   const isAdd = (q) => ADD_RE.test(fold(q));
 
   function parseAdd(text, now, tz) {

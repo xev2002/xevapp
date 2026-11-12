@@ -240,6 +240,12 @@ main{position:relative;z-index:1;padding-bottom:calc(var(--sb) + 130px)}
 .cal-d em{position:absolute;top:2px;right:4px;font-style:normal;font-size:10px;font-weight:800;color:#C0605A}
 .cal-t{width:48px;flex:none;font-size:13px;font-weight:650;color:var(--text2);font-variant-numeric:tabular-nums}
 .seg button{font-size:13px}
+.su{padding:14px 14px}
+.su-ok{flex:none;width:26px;height:26px;border-radius:50%;border:2px solid var(--sep);display:grid;place-items:center;font-size:14px;font-weight:800;color:#fff;margin-top:1px}
+.su .steps li{display:block;position:relative;padding-left:32px;font-size:14px;line-height:1.4}
+.su .steps li::before{position:absolute;left:0;top:0}
+.su-ok.on{background:var(--sage);border-color:var(--sage)}
+.su .btn[disabled]{opacity:.45}
 .aurora{position:fixed;left:-25%;right:-25%;top:-15%;height:95vh;z-index:0;pointer-events:none;overflow:hidden;contain:strict}
 .aurora i{position:absolute;border-radius:50%;opacity:.6}
 .aurora i:nth-child(1){width:72vmax;height:72vmax;left:-6%;top:-18%;background:radial-gradient(circle,#A8BFE4 0%,transparent 66%);animation:none}
@@ -739,6 +745,7 @@ function viewHoy(){
   <div class="btns" style="margin-top:12px"><button class="btn sm soft" data-act="planDay">${icon("spark")}Planear mi día con IA</button></div></div></div></div>
 
   ${(()=>{const wk=dstr((()=>{const d=new Date();d.setDate(d.getDate()-((d.getDay()+6)%7));return d})());const dw=new Date().getDay();return(dw===0||dw===1)&&S.lastReview!==wk?`<div class="card tint-lav"><div class="b">🗓️ Ritual semanal · 15 min</div><div class="muted small" style="margin:4px 0 10px">Lo fijo primero, máximo ${LIM().d} DEBO y ${LIM().s} DEBERÍA por día, y lo que no cabe a la próxima semana.</div><div class="btns"><button class="btn sm" data-act="ritual" data-wk="${wk}">Planear mi semana</button><button class="btn sm ghost" data-act="ritualSkip" data-wk="${wk}">Hoy no</button></div></div>`:""})()}
+  ${setupCard()}
   ${!S.profile.context?`<div class="card tint-blue"><div class="b">Cuéntale a Xevapp quién eres</div><div class="muted small" style="margin:4px 0 10px">Tus agentes lo leerán siempre para responderte de forma personal.</div><button class="btn sm soft" data-act="context">Escribir mi contexto</button></div>`:""}
   ${chT.length?`<h2 class="sec">Retos de hoy</h2>${chT.map(c=>chRow(c)).join("")}`:""}
   <h2 class="sec">Enfoque del día <button class="link" data-act="pickFocus">${focus.length?"Editar":"Elegir"}</button></h2>
@@ -1518,7 +1525,7 @@ const XV = (() => {
     return `${h12 === 1 && !m ? "la una" : "las " + h12}${m ? ":" + String(m).padStart(2, "0") : ""} ${per}`;
   };
 
-  const ADD_RE = /^\s*(?:por favor[, ]*)?(?:xeva[, ]*)?(?:(recuerdame|recordarme|recuerda|anota|anotar|agrega|agregar|anade|anadir|apunta|apuntar|crea|crear|programa|programar|no olvides|tengo que|debo|deberia)\b)[:,]?\s*(?:que\s+|una?\s+(?:tarea|recordatorio)\s+(?:de\s+|para\s+)?)?/;
+  const ADD_RE = /^\s*(?:por favor[, ]*)?(?:xeva[, ]*)?(?:(recuerdame|recordarme|recuerda|anota|anotar|agrega|agregar|anade|anadir|apunta|apuntar|guarda|guardar|guardame|crea|crear|programa|programar|no olvides|tengo que|debo|deberia)\b)[:,]?\s*(?:que\s+|una?\s+(?:tarea|recordatorio)\s+(?:de\s+|para\s+)?)?/;
   const isAdd = (q) => ADD_RE.test(fold(q));
 
   function parseAdd(text, now, tz) {
@@ -1599,6 +1606,64 @@ const XV = (() => {
   return { fold, parts, toTs, addD, isAdd, isAsk, parseAdd, confirmAdd, answer, when, dayName, say };
 })();
 /* ---- fin Xeva voz ---- */
+
+/* ---------- Configurar Xevapp (todo dentro de la app) ---------- */
+const isSafari=()=>/Safari/.test(navigator.userAgent)&&!/CriOS|FxiOS|EdgiOS|OPiOS|GSA|FBAN|FBAV|Instagram|Line\//.test(navigator.userAgent);
+function setupStatus(){
+  const inst=!isIOS||standalone();
+  const notif=("Notification" in window)&&Notification.permission==="granted"&&S.settings.notif;
+  const ai=!!getKeys()[S.settings.provider];
+  const voice=!!S.voiceOk;
+  const push=S.pushInfo==="ok";
+  return{inst,notif,ai,voice,push,done:[inst,notif,ai,voice].filter(Boolean).length};
+}
+function setupCard(){const st=setupStatus();if(st.done>=4)return"";return`<div class="card tint-blue" data-act="setup"><div class="between"><div><div class="b">⚙️ Termina de configurar Xevapp</div><div class="muted small">${st.done} de 4 listos · instalar, avisos, IA y voz</div></div><span class="b" style="color:var(--blue)">›</span></div></div>`}
+function setupSheet(){
+  const st=setupStatus(),P=PROVIDERS[S.settings.provider]||PROVIDERS.openrouter,k=getKeys()[S.settings.provider];
+  const mark=ok=>`<span class="su-ok ${ok?"on":""}">${ok?"✓":""}</span>`;
+  const step=(n,ok,title,body)=>`<div class="card su"><div class="row" style="gap:10px;align-items:flex-start">${mark(ok)}<div style="flex:1;min-width:0"><div class="b">${n}. ${title}</div>${body}</div></div></div>`;
+  const install=st.inst?`<div class="muted small">Estás usando Xevapp instalada. ✔</div>`:
+    !isSafari()?`<div class="small">Estás en otro navegador. <b>Copia la dirección y ábrela en Safari</b>: solo Safari puede instalarla en el iPhone.</div><div class="btns" style="margin-top:8px"><button type="button" class="btn sm soft" data-copyurl>Copiar dirección</button></div>`:
+    `<ol class="steps small" style="margin:6px 0 0"><li>Toca <b>Compartir</b> <span style="font-size:15px">⎙</span> (abajo, o en el menú <b>···</b>).</li><li>Baja y toca <b>Añadir a pantalla de inicio</b>.</li><li>Deja activado <b>Abrir como app web</b> y toca <b>Añadir</b>.</li><li>Cierra Safari y abre <b>Xevapp desde el ícono nuevo</b>. Vuelve aquí.</li></ol><div class="muted tiny" style="margin-top:6px">Si ya lo hiciste y ves esta pantalla, estás en Safari, no en la app instalada: busca el ícono Xevapp en tu inicio o en la Biblioteca de apps.</div>`;
+  openSheet({title:"Configurar Xevapp",saveLabel:"Listo",html:`
+    ${step(1,st.inst,"Instalar en tu iPhone",install)}
+    ${step(2,st.notif,"Notificaciones",`<div class="muted small">${st.inst?"Permite los avisos y envíate una prueba.":"Primero instala (paso 1): iPhone solo da avisos a la app instalada."}</div>
+      <div class="btns" style="margin-top:8px"><button type="button" class="btn sm soft" data-nperm ${st.inst?"":"disabled"}>${st.notif?"Permitidas ✓":"Permitir avisos"}</button><button type="button" class="btn sm ghost" data-ntest ${st.notif?"":"disabled"}>Prueba ahora</button><button type="button" class="btn sm ghost" data-ntest10 ${st.notif?"":"disabled"}>Prueba en 10 s</button></div><div class="small" data-nout style="margin-top:6px;color:var(--text2)"></div>`)}
+    ${step(3,st.ai,"Conectar la IA gratis",`<div class="muted small">Para conversar y que Xeva responda preguntas abiertas. Recomendado: OpenRouter.</div>
+      ${fld("Servicio",sel("su_prov",Object.entries(PROVIDERS).map(([v,p])=>[v,p.name]),S.settings.provider))}
+      <div class="small" style="margin:-4px 2px 8px">1) Abre <a class="link" data-keyurl href="${P.keyUrl}" target="_blank" rel="noopener">${P.keyUrl.replace("https://","")}</a>, entra y crea una clave. 2) Cópiala y pégala aquí.</div>
+      ${fld("Clave",inp("su_key",k?"•".repeat(10)+k.slice(-4):"","password",`placeholder="${P.keyHint}" autocomplete="off" autocapitalize="off" spellcheck="false"`))}
+      <div class="btns"><button type="button" class="btn sm soft" data-aitest>Guardar y probar</button></div><div class="small" data-aout style="margin-top:6px;color:var(--text2)"></div>`)}
+    ${step(4,st.voice,"Hablar con Xeva",`<div class="muted small">Toca el micrófono y di: <i>“recuérdame mañana a las 3 pagar el arriendo”</i> o <i>“¿qué me toca hoy?”</i>.</div>
+      <div class="btns" style="margin-top:8px"><button type="button" class="btn sm soft" data-vtest>🎙️ Probar micrófono</button><button type="button" class="btn sm ghost" data-stest>🔊 Probar voz</button></div><div class="small" data-vout style="margin-top:6px;color:var(--text2)"></div>`)}
+    ${step(5,st.push,"Avisos con la app cerrada (opcional)",`<div class="muted small">${st.push?"Conectado: te llegan aunque cierres Xevapp. ✔":"Sin esto, los avisos llegan solo con Xevapp abierta o usada hace poco. Necesita tu servidor gratuito en Cloudflare (se hace una vez)."}</div>
+      ${st.push?"":`<ol class="steps small" style="margin:6px 0"><li>Entra a <a class="link" href="https://dash.cloudflare.com/sign-up" target="_blank" rel="noopener">dash.cloudflare.com</a> (cuenta gratis).</li><li><b>Storage & Databases → KV → Create</b>, nombre <b>XEVA</b>.</li><li><b>Workers & Pages → Create → Hello World</b> → nombre <b>xevapp-avisos</b> → Deploy.</li><li><b>Edit code</b>: borra todo, pega el código (botón de abajo) y <b>Deploy</b>.</li><li>En el Worker: <b>Settings → Bindings → KV</b>: variable <b>XEVA</b>, namespace XEVA. <b>Settings → Triggers → Cron</b>: <b>* * * * *</b>.</li><li>Copia la dirección <i>…workers.dev</i>, pégala aquí y toca Conectar.</li></ol>
+      <div class="btns"><button type="button" class="btn sm ghost" data-copyworker>Copiar código del servidor</button></div>`}
+      ${fld("Dirección del servidor",inp("su_push",S.settings.pushUrl,"url",'placeholder="https://xevapp-avisos.TU-USUARIO.workers.dev" autocapitalize="off" spellcheck="false"'))}
+      <div class="btns"><button type="button" class="btn sm soft" data-pconn>${st.push?"Reconectar":"Conectar"}</button>${st.push?'<button type="button" class="btn sm ghost" data-ptest2>Prueba con app cerrada</button>':""}</div><div class="small" data-pout style="margin-top:6px;color:var(--text2)"></div>`)}`,
+    submit:()=>{},
+    onMount:(f,close)=>{
+      const q=s=>$(s,f),reopen=()=>{close();setTimeout(()=>{render();setupSheet()},260)};
+      q("[data-copyurl]")&&(q("[data-copyurl]").onclick=async()=>{try{await navigator.clipboard.writeText(location.href.split("?")[0]);toast("Dirección copiada. Pégala en Safari.")}catch{toast(location.href)}});
+      q("[data-nperm]").onclick=async()=>{if(await enableNotifs())reopen()};
+      const testN=async(out)=>{try{const reg=swReg||await navigator.serviceWorker.ready;await reg.showNotification("Xevapp 🔔",{body:"¡Funciona! Así te llegarán tus avisos.",icon:"icon-192.png",badge:"icon-192.png",tag:"prueba-"+Date.now()});out.textContent="✓ Enviada. Si no la ves arriba, baja el centro de notificaciones."}catch(e){out.textContent="No se pudo: "+(e.message||e)}};
+      q("[data-ntest]").onclick=()=>testN(q("[data-nout]"));
+      q("[data-ntest10]").onclick=()=>{const o=q("[data-nout]");let n=10;o.textContent="Llega en 10 s. Deja Xevapp abierta (puedes ir a otra pestaña de la app).";const t=setInterval(()=>{n--;if(n<=0){clearInterval(t);testN(o)}else if(document.body.contains(o))o.textContent=`Llega en ${n} s…`},1000)};
+      f.su_prov.onchange=()=>{S.settings.provider=f.su_prov.value;save();reopen()};
+      q("[data-aitest]").onclick=async()=>{const o=q("[data-aout]"),pv=f.su_prov.value,typed=f.su_key.value.trim();const key=typed&&!typed.includes("•")?typed:getKeys()[pv];if(!key){o.textContent="Pega tu clave primero.";return}o.textContent="Probando…";const msg=await testConnection(pv,key);o.textContent=msg;if(/^✓/.test(msg)){setKey(pv,key);S.settings.provider=pv;save();toast("IA conectada ✓");setTimeout(reopen,900)}};
+      q("[data-stest]").onclick=()=>{unlockSpeech();speak("Hola, soy Xeva. Ya puedo hablarte.");q("[data-vout]").textContent="Si no escuchaste nada: sube el volumen y quita el modo silencio."};
+      q("[data-vtest]").onclick=()=>{unlockSpeech();const o=q("[data-vout]"),SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+        if(!SR){S.voiceOk=true;save();o.innerHTML="Este iPhone no deja usar el micrófono directo en apps web. Usa el <b>🎙️ del teclado</b> dentro del panel de Xeva: funciona igual. ✓";return}
+        const r=new SR();r.lang="es-CO";r.interimResults=true;let txt="";o.textContent="Te escucho… di algo.";
+        r.onresult=e=>{txt=[...e.results].map(x=>x[0].transcript).join("");o.textContent="“"+txt+"”"};
+        r.onerror=e=>{o.textContent=e.error==="not-allowed"||e.error==="service-not-allowed"?"Permiso negado. Ve a Ajustes del iPhone → Apps → Safari → Micrófono → Permitir, y vuelve a probar.":"No te escuché. Prueba otra vez."};
+        r.onend=()=>{if(txt){S.voiceOk=true;save();o.textContent="✓ Te escuché: “"+txt+"”";speak("Te escuché perfecto.")}};
+        try{r.start()}catch{o.textContent="No se pudo iniciar el micrófono."}};
+      q("[data-copyworker]")&&(q("[data-copyworker]").onclick=async()=>{try{const t=await (await fetch("xevapp-avisos-worker.js",{cache:"no-store"})).text();await navigator.clipboard.writeText(t);toast("Código copiado ✓ Pégalo en Cloudflare")}catch{toast("No se pudo copiar")}});
+      q("[data-pconn]").onclick=async()=>{S.settings.pushUrl=f.su_push.value.trim();save();const o=q("[data-pout]");await connectPush(o);if(S.pushInfo==="ok")setTimeout(reopen,1200)};
+      q("[data-ptest2]")&&(q("[data-ptest2]").onclick=()=>{testPush(q("[data-pout]"));q("[data-pout]").textContent+=" Cierra Xevapp ya y espera unos segundos."});
+    }});
+}
 
 /* ---------- Calendario mensual ---------- */
 const MES=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
@@ -1979,6 +2044,7 @@ function settingsSheet(){
   ${sw("shareContext",st.shareContext,"Compartir mis tareas y rutinas con el asistente","Mejora las respuestas")}
   ${sw("shareFinance",st.shareFinance,"Compartir mis montos de dinero","Apagado por defecto")}
 
+  <div class="btns" style="margin-bottom:6px"><button type="button" class="btn sm soft" data-setup>⚙️ Asistente de configuración</button></div>
   <h2 class="sec">Notificaciones</h2>
   ${sw("notif",st.notif,"Avisos en el iPhone",standalone()||!isIOS?"Recordatorios, rutinas, ahorro y presupuesto":"Requiere instalar Xevapp en la pantalla de inicio")}
   <div class="f2">${fld("Silencio desde",inp("quietFrom",st.quietFrom,"time"))}${fld("hasta",inp("quietTo",st.quietTo,"time"))}</div>
@@ -2016,6 +2082,7 @@ function settingsSheet(){
   },
   onMount:(f,close)=>{
     const pOut=$("#pushOut",f);
+    $("[data-setup]",f).onclick=()=>{close();setTimeout(setupSheet,260)};
     $("[data-push]",f).onclick=async()=>{S.settings.pushUrl=f.pushUrl.value.trim();await connectPush(pOut)};
     $("[data-copyask]",f)&&($("[data-copyask]",f).onclick=async()=>{const u=`Dirección: ${pushBase()}/ask\nid: ${S.pushId}\ntz: ${TZ()}`;try{await navigator.clipboard.writeText(u);toast("Datos del atajo copiados ✓")}catch{pOut.textContent=u}});
     $("[data-ptest]",f)&&($("[data-ptest]",f).onclick=()=>testPush(pOut));
@@ -2129,6 +2196,7 @@ const A={
   editRoutine:d=>routineForm(S.routines.find(x=>x.id===d.id)),
   newRoutine:()=>routineForm(),
   newChal:()=>challengeForm(),
+  setup:()=>setupSheet(),
   chalTpl:d=>challengeForm(null,d.v),
   editChal:d=>{const c=(S.challenges||[]).find(x=>x.id===d.id);c&&challengeForm(c)},
   chalDo:d=>{const c=(S.challenges||[]).find(x=>x.id===d.id);if(!c)return;if(c.type==="choice")chLog(c.id,{s:"done",opt:c.options[Number(d.v)||0]});else chLog(c.id,{s:"done",n:chTarget(c,today())})},
@@ -2220,6 +2288,7 @@ function detectSandbox(){
   load();applyTheme();detectSandbox();
   render({anim:true});
   if(!S.onboarded)onboarding();
+  else if(isIOS&&standalone()&&setupStatus().done<4&&S.ui.setupSeen!==1){S.ui.setupSeen=1;save();setTimeout(setupSheet,900)}
   await registerSW();
   if(PREVIEW&&S.ui.tab==="asistente")render();
   mountFab();
