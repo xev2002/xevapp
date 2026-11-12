@@ -422,7 +422,8 @@ const uid=()=>(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Mat
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const pad=n=>String(n).padStart(2,"0");
 const dstr=(d=new Date())=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-const today=()=>dstr();
+let DAY_CUT=4;
+const today=()=>dstr(new Date(Date.now()-DAY_CUT*3600e3));
 const monthKey=(d=new Date())=>`${d.getFullYear()}-${pad(d.getMonth()+1)}`;
 const parseD=s=>{if(!s)return null;const [y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)};
 const DOW=["Do","Lu","Ma","Mi","Ju","Vi","Sá"];
@@ -455,7 +456,7 @@ function def(){return{
   profile:{name:"",city:"",skills:"",interests:"",hours:"",capital:"",context:""},lastReview:"",
   tasks:[],routines:[],challenges:[],checklists:[],goals:[],money:[],budgets:{},ideas:[],people:[],decisions:[],content:[],reminders:[],
   chats:{},fired:{},notifCount:{},pays:[],research:[],pushId:"",pushInfo:"",
-  settings:{pushUrl:"",digest:"07:00",maxDebo:3,maxDeb:2,voice:false,theme:"auto",currency:"COP",provider:"openrouter",models:{openrouter:"openrouter/free",gemini:"gemini-2.5-flash",groq:"llama-3.3-70b-versatile"},shareContext:true,shareFinance:false,reduceMotion:false,notif:false,quietFrom:"22:00",quietTo:"07:00",maxNotif:12},
+  settings:{dayCut:4,pushUrl:"",digest:"07:00",maxDebo:3,maxDeb:2,voice:false,theme:"auto",currency:"COP",provider:"openrouter",models:{openrouter:"openrouter/free",gemini:"gemini-2.5-flash",groq:"llama-3.3-70b-versatile"},shareContext:true,shareFinance:false,reduceMotion:false,notif:false,quietFrom:"22:00",quietTo:"07:00",maxNotif:12},
   ui:{tab:"hoy",planear:"tareas",kind:"debo",area:"Todas",dinero:"metas",negocio:"ideas",agent:"planner"}
 }}
 let S=def();
@@ -1635,7 +1636,7 @@ function rollDay(){
   armMidnight();
   return true;
 }
-function armMidnight(){clearTimeout(midT);const n=new Date(),m=new Date(n.getFullYear(),n.getMonth(),n.getDate()+1,0,0,5);midT=setTimeout(()=>{rollDay();maybeCheckin()},Math.min(m-n,2147483000))}
+function armMidnight(){clearTimeout(midT);const n=new Date();let m=new Date(n.getFullYear(),n.getMonth(),n.getDate(),DAY_CUT,0,5);if(m<=n)m=new Date(n.getFullYear(),n.getMonth(),n.getDate()+1,DAY_CUT,0,5);midT=setTimeout(()=>{rollDay();maybeCheckin()},Math.min(m-n,2147483000))}
 function wake(){if(!rollDay())render();importVoice();checkReminders();maybeCheckin();armMidnight()}
 
 /* ---------- Configurar Xevapp (todo dentro de la app) ---------- */
@@ -2078,6 +2079,7 @@ function settingsSheet(){
   <div class="btns" style="margin-bottom:6px"><button type="button" class="btn sm soft" data-setup>⚙️ Asistente de configuración</button></div>
   <h2 class="sec">Notificaciones</h2>
   ${sw("notif",st.notif,"Avisos en el iPhone",standalone()||!isIOS?"Recordatorios, rutinas, ahorro y presupuesto":"Requiere instalar Xevapp en la pantalla de inicio")}
+  ${fld("Mi día termina a las (lo que marques de madrugada cuenta para el día anterior)",sel("dayCut",[["0","12:00 a. m. (medianoche)"],["2","2:00 a. m."],["3","3:00 a. m."],["4","4:00 a. m."],["5","5:00 a. m."],["6","6:00 a. m."]],String(st.dayCut??4)))}
   <div class="f2">${fld("Silencio desde",inp("quietFrom",st.quietFrom,"time"))}${fld("hasta",inp("quietTo",st.quietTo,"time"))}</div>
   ${fld("Máximo de avisos al día",inp("maxNotif",st.maxNotif,"number",'min="1" max="50"'))}
   ${fld("Resumen diario (hora)",inp("digest",st.digest,"time"))}
@@ -2104,7 +2106,7 @@ function settingsSheet(){
   <p class="muted tiny" style="text-align:center;margin-top:20px">Xevapp 1.0 · tus datos viven solo en este dispositivo</p>`,
   submit:(o)=>{
     const prev=st.theme;
-    st.provider=o.provider;st.shareContext=!!o.shareContext;st.shareFinance=!!o.shareFinance;st.theme=o.theme;st.currency=o.currency;st.reduceMotion=!!o.reduceMotion;st.quietFrom=o.quietFrom;st.quietTo=o.quietTo;st.maxNotif=clamp(Number(o.maxNotif)||12,1,50);
+    st.provider=o.provider;st.shareContext=!!o.shareContext;st.shareFinance=!!o.shareFinance;st.theme=o.theme;st.currency=o.currency;st.reduceMotion=!!o.reduceMotion;st.quietFrom=o.quietFrom;st.dayCut=Number(o.dayCut);DAY_CUT=st.dayCut;armMidnight();st.quietTo=o.quietTo;st.maxNotif=clamp(Number(o.maxNotif)||12,1,50);
     if(o.model!==undefined)st.models[o.provider]=o.model.trim()||def().settings.models[o.provider];
     if(o.apikey!==undefined&&o.apikey.trim()&&!o.apikey.includes("•"))setKey(o.provider,o.apikey.trim());
     st.digest=o.digest||"";if(o.pushUrl!==undefined&&o.pushUrl.trim()!==st.pushUrl){st.pushUrl=o.pushUrl.trim();if(!st.pushUrl)S.pushInfo=""}schedSync();
@@ -2316,7 +2318,10 @@ function detectSandbox(){
   try{if(window.top!==window.self)PREVIEW=true}catch{PREVIEW=true}
 }
 (async function init(){
-  load();applyTheme();detectSandbox();
+  load();DAY_CUT=Number(S.settings.dayCut??4);
+  // una sola vez: reiniciar las flexiones desde hoy (pedido del 12 de nov)
+  if(!S.mig_flex1){S.mig_flex1=1;(S.challenges||[]).filter(c=>c.type==="progressive"&&/flexi/i.test(c.name+" "+(c.unit||""))).forEach(c=>{c.from=today();c.log={}});save()}
+  applyTheme();detectSandbox();
   render({anim:true});
   if(!S.onboarded)onboarding();
   else if(isIOS&&standalone()&&setupStatus().done<4&&S.ui.setupSeen!==1){S.ui.setupSeen=1;save();setTimeout(setupSheet,900)}
